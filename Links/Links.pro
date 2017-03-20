@@ -25,7 +25,12 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 SOURCES += main.cpp\
         widget.cpp \
-    QLinuxFileLink/qlinuxfilelink.cpp
+    QLinuxFileLink/qlinuxfilelink.cpp \
+    QFixSymlink/qfixsymlink.cpp
 
 HEADERS  += widget.h \
-    QLinuxFileLink/qlinuxfilelink.h
+    QLinuxFileLink/qlinuxfilelink.h \
+    QFixSymlink/qfixsymlink.h
+
+RESOURCES += \
+    icons.qrc

@@ -1,4 +1,4 @@
-#ifndef WIDGET_H
+﻿#ifndef WIDGET_H
 #define WIDGET_H
 
 #include <QWidget>
@@ -6,8 +6,21 @@
 #include <QFile>
 #include <QDir>
 #include <QFileInfo>
+#include <QLabel>
+#include <QLineEdit>
+#include <QPushButton>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QGridLayout>
+#include <QListWidget>
+#include <QListWidgetItem>
+#include <QProgressBar>
+#include <QFileDialog>
+#include <QThread>
+#include <QTime>
 
 #include "QLinuxFileLink/qlinuxfilelink.h"
+#include "QFixSymlink/qfixsymlink.h"
 
 
 
@@ -19,7 +32,36 @@ public:
     Widget(QWidget *parent = 0);
     ~Widget();
 
+private:
     QLinuxFileLink *fileLink;
+    QFixSymlink *fixSymlink;
+    QThread *thrFixSymlink;
+
+    void createForm();
+    QVBoxLayout *mainLayout;
+    QGridLayout *layoutPath;
+    QLabel *labelSourcePath;
+    QLineEdit *editSourcePath;
+    QPushButton *buttonSourcePath;
+    QLabel *labelTargetPath;
+    QLineEdit *editTargetPath;
+    QPushButton *buttonTargetPath;
+
+    QPushButton *buttonDoIt;
+
+    QListWidget *logWidget;
+    QProgressBar *progressWork;
+
+
+private slots:
+    void slotPushSourceButton();
+    void slotPushTargetButton();
+    void slotPushButtonDoIt();
+
+    void slotStartWork();
+    void slotStopWork();
+    void slotInformation(QString message);
+    void slotError(QString message);
 };
 
 #endif // WIDGET_H
