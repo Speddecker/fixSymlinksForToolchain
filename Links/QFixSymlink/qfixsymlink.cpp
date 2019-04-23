@@ -2,14 +2,6 @@
 
 QFixSymlink::QFixSymlink(QObject *parent) : QObject(parent)
 {
-    /*
-    qDebug()<<"find symlinks";
-    QStringList sym;
-    findSymLinks("/opt/QtBuild/rootfs",&sym);
-
-    for (int i=0;i<sym.length();i++)
-        qDebug()<<sym.at(i);
-        */
 }
 
 QFixSymlink::~QFixSymlink()
@@ -17,24 +9,40 @@ QFixSymlink::~QFixSymlink()
 
 }
 
-void QFixSymlink::doFixSymlink(QString sourceDir,QString targetDir)
+void QFixSymlink::doFixSymlink()
 {
     emit signalStartWork();
 
-    if (checkDir(sourceDir,targetDir))
+    if (checkDir(sourceDirPath,targetDirPath))
     {
-        qDebug()<<"dir ok";
-        if (copyContentDir(sourceDir,targetDir))
+        if (copyContentDir(sourceDirPath,targetDirPath))
         {
             QStringList symLinks;
-            if (findSymLinks(targetDir,&symLinks))
-            {
-                qDebug()<<"Find symlinks Ok";
-            }
+            findSymLinks(targetDirPath,&symLinks);
         }
     }
 
     emit signalStopWork();
+}
+
+QString QFixSymlink::getSourceDirPath() const
+{
+    return sourceDirPath;
+}
+
+void QFixSymlink::setSourceDirPath(const QString &value)
+{
+    sourceDirPath = value;
+}
+
+QString QFixSymlink::getTargetDirPath() const
+{
+    return targetDirPath;
+}
+
+void QFixSymlink::setTargetDirPath(const QString &value)
+{
+    targetDirPath = value;
 }
 
 bool QFixSymlink::checkDir(QString sourceDir,QString targetDir)
@@ -49,14 +57,11 @@ bool QFixSymlink::checkDir(QString sourceDir,QString targetDir)
     {
         if ((targetD.exists())&&(!targetDir.isEmpty()))
         {
-            if (targetD.entryList(QStringList("*"),QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot).length()==0)
+            if (sourceD.entryList(QStringList("*"),QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot).length()>0)
             {
-                if (sourceD.entryList(QStringList("*"),QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot).length()>0)
-                {
-                    emit signalInformation(tr("Folders checked"));
-                    Output = true;
-                } else emit signalError(tr("Source directory is empty"));
-            } else emit signalError(tr("Target directory not empty"));
+                emit signalInformation(tr("Directories are valid"));
+                Output = true;
+            } else emit signalError(tr("Source directory is empty"));
         } else emit signalError(tr("Target directory error"));
     } else emit signalError(tr("Source directory error"));
 
@@ -67,31 +72,34 @@ bool QFixSymlink::copyContentDir(QString sourceDir,QString targetDir)
 {
     bool Output = true;
     emit signalInformation(tr("Start copy rootfs"));
+
     //Получаем структуру внутренних папок
-    //QDir currentDir("/opt/QtBuild/rootfs");
     QDir currentDir(sourceDir);
     QStringList dirs;
 
     QString buf;
-    QDirIterator it("/opt/QtBuild/rootfs", QDirIterator::Subdirectories);
+    QDirIterator it(sourceDir, QDirIterator::Subdirectories);
     QFileInfo fileInfo;
     while (it.hasNext()) {
         buf = it.next();
         fileInfo.setFile(buf);
-        if ((buf.indexOf(".")<0)&&(buf.indexOf("..")<0)&&(fileInfo.isDir()))
+        if ((buf.indexOf("/.")<0)&&(buf.indexOf("/..")<0)&&(fileInfo.isDir()))
         {
-
-            buf.remove("/opt/QtBuild/rootfs");
+            buf.remove(sourceDir);
             dirs.append(buf);
         }
     }
 
     QDir targetD (targetDir);
-    //Создаем лерево в целевой папке
+
+
+    //Создаем дерево в целевой папке
     for (int i=0;i<dirs.length();i++)
-        targetD.mkdir(targetDir+dirs.at(i));
-
-
+    {
+        QDir dir(targetDir+dirs.at(i));
+        if (!dir.exists())
+            targetD.mkdir(targetDir+dirs.at(i));
+    }
 
     // Составляем дерево файлов
     QStringList files;
@@ -106,17 +114,30 @@ bool QFixSymlink::copyContentDir(QString sourceDir,QString targetDir)
 
 
     // Копируем файлы
-    for (int i=0;i<files.length();i++)
+    copiedFiles.setFileName(targetD.path() + "/copiedFiles.txt");
+    if(copiedFiles.open(QIODevice::ReadWrite | QIODevice::Text))
     {
-       QFile::copy(currentDir.path()+files.at(i),targetD.path()+files.at(i));
+        qDebug() << "Копируем файлы" << files.length();
+        for (int i=0;i<files.length();i++)
+        {
+            qDebug() << i << "of" << files.length() << files.at(i);
+            emit checkProgress(static_cast<double>(i)/files.length()*100+0.5);
+            if(QFile::copy(currentDir.path()+files.at(i),targetD.path()+files.at(i)))
+            {
+                *textStream << targetD.path() + files.at(i) << '\n';
+            }
+        }
+
+        emit signalInformation(tr("Finish copy rootfs"));
     }
-    emit signalInformation(tr("Finish copy rootfs"));
+    else emit signalError(tr("Cannot open file in target dir"));
+
     return Output;
 }
 
 bool QFixSymlink::findSymLinks(QString sourceDir,QStringList *symLinks)
 {
-    emit signalInformation(tr("Find symlinks"));
+    emit signalInformation(tr("Start search symlinks"));
     bool Output = true;
 
     QFileInfo fileInfo;
@@ -131,8 +152,55 @@ bool QFixSymlink::findSymLinks(QString sourceDir,QStringList *symLinks)
         if (fileInfo.isSymLink()) symLinks->append(files.at(i));
     }
 
-    emit signalInformation(tr("Fount")+" "+QString::number(symLinks->length())+" "+tr("symlinks"));
+    emit signalInformation(tr("Found")+" "+QString::number(symLinks->length())+" "+tr("symlinks"));
     return Output;
+}
+
+void QFixSymlink::startCopy()
+{
+    doFixSymlink();
+}
+
+void QFixSymlink::startClear()
+{
+    clearTargetDir(targetDirPath);
+}
+
+void QFixSymlink::clearTargetDir(QString targetDir)
+{
+    emit signalInformation(tr("Start clear target dir"));
+
+    if(targetDir.isEmpty())
+    {
+        emit signalError(tr("Target dir path is empty"));
+    }
+    else
+    {
+        copiedFiles.setFileName(targetDir + "/copiedFiles.txt");
+        if(copiedFiles.open(QIODevice::ReadWrite | QIODevice::Text))
+        {
+            // Получаем список скопированных файлов
+            QStringList files;
+            QTextStream stream (&copiedFiles);
+
+            while (!copiedFiles.atEnd())
+            {
+                files.append(stream.readLine());
+            }
+
+            // Удаляем файлы
+            for (int i = 0; i < files.length(); i++)
+            {
+                emit checkProgress(static_cast<double>(i)/files.length()*100+0.5);
+
+                QFile file (files.at(i));
+                file.remove();
+            }
+
+            emit signalInformation(tr("Target dir has been cleared"));
+        }
+        else emit signalError(tr("Cannot open file in targed dir"));
+    }
 }
 
 static void findRecursion(const QString &path, const QString &pattern, QStringList *result)
@@ -140,9 +208,15 @@ static void findRecursion(const QString &path, const QString &pattern, QStringLi
     QDir currentDir(path);
     const QString prefix = path + QLatin1Char('/');
     foreach (const QString &match, currentDir.entryList(QStringList(pattern), QDir::Files | QDir::Hidden | QDir::System ))
-        result->append(prefix + match);
+    {
+        if(match.indexOf("libQt") < 0)
+            result->append(prefix + match);
+    }
     foreach (const QString &dir, currentDir.entryList(QDir::Dirs | QDir::NoSymLinks | QDir::NoDotAndDotDot))
-        findRecursion(prefix + dir, pattern, result);
+    {
+        if((dir != "home")&&(dir != "etc")&&(dir != "tmp")&&(dir != "bin")&&(dir != "sbin")&&(dir != "var")&&(dir != "dev"))
+            findRecursion(prefix + dir, pattern, result);
+    }
 }
 
 

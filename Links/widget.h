@@ -22,8 +22,6 @@
 #include "QLinuxFileLink/qlinuxfilelink.h"
 #include "QFixSymlink/qfixsymlink.h"
 
-
-
 class Widget : public QWidget
 {
     Q_OBJECT
@@ -52,16 +50,24 @@ private:
     QListWidget *logWidget;
     QProgressBar *progressWork;
 
+    //Элементы для очистки sysroot
+    QPushButton* clearSysrootButton = nullptr;
+
+signals:
+    void readyToCopy();
+    void readyToClear();
 
 private slots:
     void slotPushSourceButton();
     void slotPushTargetButton();
     void slotPushButtonDoIt();
+    void clearTargetDir();
 
     void slotStartWork();
     void slotStopWork();
     void slotInformation(QString message);
     void slotError(QString message);
+    void slotCheckProgress(int value);
 };
 
 #endif // WIDGET_H

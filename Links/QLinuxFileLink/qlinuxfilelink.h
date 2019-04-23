@@ -18,8 +18,8 @@ class QLinuxFileLink : public QObject
 {
     Q_OBJECT
 public:
-    explicit QLinuxFileLink(QObject *parent = 0);
-    explicit QLinuxFileLink(QString linkName,QObject *parent = 0);
+    explicit QLinuxFileLink(QObject *parent = nullptr);
+    explicit QLinuxFileLink(QString linkName,QObject *parent = nullptr);
     ~QLinuxFileLink();
 
     QString getLinkName();
@@ -29,7 +29,7 @@ public:
     void setLinkName(QString linkName);
     bool setTargetName(QString targetName);
 
-    const bool isLink(QString fileName);
+    bool isLink(QString fileName);
 private:
     QString currentLinkName;
     QString currentTargetName;

@@ -1,8 +1,8 @@
 #include "qlinuxfilelink.h"
+#include "linux/limits.h"
 
 QLinuxFileLink::QLinuxFileLink(QObject *parent) : QObject(parent)
 {
-
 }
 
 QLinuxFileLink::QLinuxFileLink(QString linkName,QObject *parent) : QObject(parent)
@@ -13,7 +13,6 @@ QLinuxFileLink::QLinuxFileLink(QString linkName,QObject *parent) : QObject(paren
 
 QLinuxFileLink::~QLinuxFileLink()
 {
-
 }
 
 QString QLinuxFileLink::getLinkName()
@@ -42,13 +41,13 @@ void QLinuxFileLink::loadLinkFile()
 {
     struct stat sb;
     char *linkname;
-    ssize_t r, bufsiz;
+    ssize_t r, bufsize;
 
-    qDebug()<<"lstat="<<lstat(currentLinkName.toStdString().c_str(), &sb);
-    bufsiz = sb.st_size + 1;
-    if (sb.st_size == 0) bufsiz = PATH_MAX;
-    linkname = (char*)malloc(bufsiz);
-    r = readlink(currentLinkName.toStdString().c_str(), linkname, bufsiz);
+    lstat(currentLinkName.toStdString().c_str(), &sb);
+    bufsize = sb.st_size + 1;
+    if (sb.st_size == 0) bufsize = PATH_MAX; //PATH_MAX variable from linux/limits.h
+    linkname = (char*)malloc(bufsize);
+    r = readlink(currentLinkName.toStdString().c_str(), linkname, bufsize);
     linkname[r] = '\0';
 
     currentTargetName = QString(linkname);
@@ -86,7 +85,7 @@ QStringList QLinuxFileLink::getSymLinkList(QString path)
     return result2;
 }
 
-const bool QLinuxFileLink::isLink(QString fileName)
+bool QLinuxFileLink::isLink(QString fileName)
 {
     QFileInfo fileInfo(fileName);
 

@@ -3,35 +3,21 @@
 Widget::Widget(QWidget *parent)
     : QWidget(parent)
 {
-    qDebug()<<"Старт программы";
-    QString linkName = "/home/homer/!QT/workWithLinks/link2.txt";
+    QString linkName = "/home/stanislav/Desktop/fixSymlinkForToolchain/link2.txt";
     fileLink = new QLinuxFileLink(linkName);
-
-    qDebug()<<"Link name="<<fileLink->getLinkName();
-    qDebug()<<"Target name ="<<fileLink->getTargenName();
-
-    //qDebug()<<"Set target name="<<fileLink->setTargetName("source.txt");
-
-    //QDir currentDir("/usr/lib");
-    //qDebug()<<"symlinks="<<currentDir.entryList(QStringList("*"), QDir::Files | QDir::Dirs);
-
-    /*
-    QStringList links = fileLink->getSymLinkList("/usr/lib");
-
-    qDebug()<<"links.length()="<<links.length();
-
-    for (int i=0;i<links.length();i++)
-        qDebug()<<links.at(i);
-     */
 
     fixSymlink = new QFixSymlink;
     thrFixSymlink = new QThread;
     fixSymlink->moveToThread(thrFixSymlink);
+    thrFixSymlink->start();
 
     connect(fixSymlink,SIGNAL(signalError(QString)),this,SLOT(slotError(QString)));
     connect(fixSymlink,SIGNAL(signalInformation(QString)),this,SLOT(slotInformation(QString)));
     connect(fixSymlink,SIGNAL(signalStartWork()),this,SLOT(slotStartWork()));
     connect(fixSymlink,SIGNAL(signalStopWork()),this,SLOT(slotStopWork()));
+    connect(fixSymlink,SIGNAL(checkProgress(int)), this, SLOT(slotCheckProgress(int)));
+    connect(this, SIGNAL(readyToCopy()), fixSymlink, SLOT(startCopy()));
+    connect(this, SIGNAL(readyToClear()), fixSymlink, SLOT(startClear()));
 
     createForm();
     slotInformation(tr("Start programm"));
@@ -51,26 +37,29 @@ void Widget::createForm()
     mainLayout->addLayout(layoutPath);
 
     labelSourcePath = new QLabel(tr("Source path"),this);
-    layoutPath->addWidget(labelSourcePath,0,0,1,1);
+    layoutPath->addWidget(labelSourcePath,0,0);
     editSourcePath = new QLineEdit(this);
     editSourcePath->setReadOnly(true);
-    layoutPath->addWidget(editSourcePath,0,1,1,1);
+    layoutPath->addWidget(editSourcePath,0,1);
     buttonSourcePath = new QPushButton("...",this);
     connect(buttonSourcePath,SIGNAL(pressed()),this,SLOT(slotPushSourceButton()));
-    layoutPath->addWidget(buttonSourcePath,0,2,1,1);
+    layoutPath->addWidget(buttonSourcePath,0,2);
 
     labelTargetPath = new QLabel(tr("Target path"),this);
-    layoutPath->addWidget(labelTargetPath,1,0,1,1);
+    layoutPath->addWidget(labelTargetPath,1,0);
     editTargetPath = new QLineEdit(this);
     editTargetPath->setReadOnly(true);
-    layoutPath->addWidget(editTargetPath,1,1,1,1);
+    layoutPath->addWidget(editTargetPath,1,1);
     buttonTargetPath = new QPushButton("...",this);
     connect(buttonTargetPath,SIGNAL(pressed()),this,SLOT(slotPushTargetButton()));
-    layoutPath->addWidget(buttonTargetPath,1,2,1,1);
+    layoutPath->addWidget(buttonTargetPath,1,2);
 
+    clearSysrootButton = new QPushButton(tr("Clear target dir"), this);
+    connect(clearSysrootButton, SIGNAL(clicked(bool)), this, SLOT(clearTargetDir()));
+    layoutPath->addWidget(clearSysrootButton, 2, 1);
     buttonDoIt = new QPushButton(tr("Do it"),this);
     connect(buttonDoIt,SIGNAL(pressed()),this,SLOT(slotPushButtonDoIt()));
-    layoutPath->addWidget(buttonDoIt,2,2,1,1);
+    layoutPath->addWidget(buttonDoIt,2,2);
 
     logWidget = new QListWidget(this);
     mainLayout->addWidget(logWidget);
@@ -96,19 +85,28 @@ void Widget::slotPushTargetButton()
 
 void Widget::slotPushButtonDoIt()
 {
-    fixSymlink->doFixSymlink(editSourcePath->text(),editTargetPath->text());
+    fixSymlink->setSourceDirPath(editSourcePath->text());
+    fixSymlink->setTargetDirPath(editTargetPath->text());
+    emit readyToCopy();
+}
+
+void Widget::clearTargetDir()
+{
+    fixSymlink->setTargetDirPath(editTargetPath->text());
+    emit readyToClear();
 }
 
 void Widget::slotStartWork()
 {
-    layoutPath->setEnabled(false);
+    buttonDoIt->setEnabled(false);
+    clearSysrootButton->setEnabled(false);
     progressWork->setValue(0);
-
 }
 
 void Widget::slotStopWork()
 {
-    layoutPath->setEnabled(true);
+    buttonDoIt->setEnabled(true);
+    clearSysrootButton->setEnabled(true);
 }
 
 void Widget::slotInformation(QString message)
@@ -121,4 +119,9 @@ void Widget::slotError(QString message)
 {
     QListWidgetItem *item = new QListWidgetItem(QIcon(":/icon/error.png"),QTime::currentTime().toString("hh:mm:ss")+" "+message);
     logWidget->addItem(item);
+}
+
+void Widget::slotCheckProgress(int value)
+{
+    progressWork->setValue(value);
 }
